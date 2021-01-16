@@ -1,6 +1,6 @@
 
 stock_basic:
-    fields: ts_code,chairman,manager,secretary,reg_capital,setup_date,province,city,introduction,website,email,office,employees,main_business,business_scope
+    fields: ts_code,symbol,name,area,industry,fullname,enname,market,exchange,curr_type,list_status,list_date,delist_date,is_hs
     enable: false
 
 stock_company:
