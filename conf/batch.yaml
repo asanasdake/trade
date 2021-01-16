@@ -1,0 +1,33 @@
+
+stock_basic:
+    fields: ts_code,chairman,manager,secretary,reg_capital,setup_date,province,city,introduction,website,email,office,employees,main_business,business_scope
+    enable: false
+
+stock_company:
+    fields: ts_code,chairman,manager,secretary,reg_capital,setup_date,province,city,introduction,website,email,office,employees,main_business,business_scope
+    enable: false
+
+exchange_open:
+    start_date: 20200101
+    end_date: 20201231
+    fields: exchange,cal_date,is_open
+    enable: false
+
+daily:
+    start_date: 20201230
+    end_date: 20201231
+    fields: ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount
+    enable: true
+
+adj_factor:
+    start_date: 20201230
+    end_date: 20201231
+    fields: ts_code,trade_date,adj_factor
+    enable: true
+
+daily_basic:
+    start_date: 20201230
+    end_date: 20201231
+    fields: ts_code,trade_date,turnover_rate,turnover_rate_f,volume_ratio,pe,pe_ttm,pb,ps,ps_ttm,dv_ratio,dv_ttm,total_share,float_share,total_mv,circ_mv
+    enable: true
+
