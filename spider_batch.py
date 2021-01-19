@@ -102,7 +102,7 @@ if __name__ == "__main__":
 
     engine = create_engine("mysql+pymysql://{}:{}@{}:{}/{}".format('root', '', 'localhost', '3306', 'trade'))
     
-    conf_file = os.path.join(os.path.abspath('..'), 'conf', 'batch.yaml')
+    conf_file = os.path.join(os.path.abspath('..'), 'conf', 'spider/batch.yaml')
     with open(conf_file, 'r', encoding = 'utf-8') as fs:
         conf_dict = yaml.load(fs, Loader = yaml.FullLoader)
 
