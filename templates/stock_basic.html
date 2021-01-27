@@ -82,7 +82,7 @@
 
             <!-- Page Heading -->
 	    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-	      <h1 class="h3 mb-0 text-gray-800">个股信息</h1>
+	      <h1 class="h3 mb-0 text-gray-800">个股信息：【{{ basic.2.1 }}】</h1>
 	    </div>
 
 	    <!-- Query Box -->
@@ -100,7 +100,7 @@
 		<h6 class="m-0 font-weight-bold text-primary">价格走势</h6>
 	      </div>
 	      <div class="card-body">
-		<div class="chart-area" id="price_chart"></div>
+		<div class="chart-area" id="price_chart" style="height:500px;"></div>
 		<script>
 		  var myChart = echarts.init(document.getElementById('price_chart'));
 		  var option;

@@ -40,7 +40,7 @@ def stock_basic():
     if ts_code != '':
 
         # query prices from table stock_daily
-        sql = "SELECT trade_date,open,close,low,high FROM stock_daily WHERE ts_code='{}' AND trade_date>='{}' AND trade_date<='{}' ORDER BY trade_date".format(ts_code, '20200101', '20201231')
+        sql = "SELECT trade_date,open,close,low,high FROM stock_daily WHERE ts_code='{}' AND trade_date BETWEEN '{}' AND '{}' ORDER BY trade_date".format(ts_code, '20200101', '20201231')
         ret = cursor.execute(sql)
         res = cursor.fetchall()
         
