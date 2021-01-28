@@ -1,129 +1,168 @@
-# -*- coding:utf-8 -*-
-
 import yaml
 import os
 from tushare.pro import data_pro as ts
 import pandas as pd
-from pandas.io import sql
-from sqlalchemy import create_engine
+import pymysql
 import datetime
+from utils import utils as ut
+import threading
+import decimal
 
-
-def value_eq(ts_value, db_value):
-    if isinstance(db_value, datetime.date):
-        db_value = db_value.strftime("%Y%m%d")
-    return ts_value == db_value
-
-
-def sql_value_escape(value):
-    if isinstance(value, str):
-        value = value.replace('%', '%%').replace("\\", "\\\\").replace("\'", "\\\'").replace("\"", "\\\"")
-    return value
-
-
-def primary_key(table):
-    if table == 'stock':
-        return ['ts_code']
-    elif table == 'exchange_daily':
-        return ['exchange', 'cal_date']
-    elif table == 'stock_daily':
-        return ['ts_code', 'trade_date']
-
-
-def insert_and_update(df, table):
-    df_insert = pd.DataFrame(columns = df.columns)
-    for _, row in df.iterrows():
-        clause_where = " AND ".join(map(lambda k: "{} = '{}'".format(k, row[k]), primary_key(table)))
-        sql_query = "SELECT * FROM {} WHERE {};".format(table, clause_where)
-        df_read = pd.read_sql_query(sql_query, engine)
-        if df_read.empty:
-            df_insert = df_insert.append(row, ignore_index = True, sort = False)
-        else:
-            need_update = False
-            set_arr = []
-            for index in df.columns:
-                if not pd.isnull(row[index]) and not value_eq(row[index], df_read.loc[0][index]):
-                    need_update = True
-                    set_arr.append("{}=\"{}\"".format(index, sql_value_escape(row[index])))
-            if need_update:
-                sql_update = "UPDATE {} SET {} WHERE {};".format(table, ','.join(set_arr), clause_where)
-                #print(sql_update)
-                sql.execute(sql_update, engine)
-                
-    if not df_insert.empty:
-        df_insert.to_sql(table, engine, index = False, if_exists = 'append')
-                                                                                                                                                                                                                                
-
-def collect_stock_basic(engine, pro, fields):
-    df = pro.stock_basic(fields = fields)
-    insert_and_update(df, 'stock')
-
-
-def collect_stock_company(engine, pro, fields):
-    df = pro.stock_company(fields = fields)
-    insert_and_update(df, 'stock')
-
-    
-def collect_exchange_open(engine, pro, start_date, end_date, fields):
-    df = pro.trade_cal(exchange = 'SSE', start_date = start_date, end_date = end_date, fields = fields)
-    insert_and_update(df, 'exchange_daily')
-    df = pro.trade_cal(exchange = 'SZSE', start_date = start_date, end_date = end_date, fields = fields)
-    insert_and_update(df, 'exchange_daily')
-
-    
-def collect_daily(engine, pro, date, fields):
-    df = pro.daily(trade_date = date.strftime("%Y%m%d"), fields = fields)
-    df.rename(columns = {'change' : 'chg'}, inplace = True)
-    insert_and_update(df, 'stock_daily')
+class insertUpdateThread (threading.Thread):
+    def __init__(self, threadID, conn, cursor, df, table, nshards):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.conn = conn
+        self.cursor = cursor
+        self.df = df
+        self.table = table
+        self.nshards = nshards
+        
+    def run(self):
+        insert_and_update(self.conn, self.cursor, self.df, self.table, self.threadID, self.nshards)
 
         
-def collect_adj_factor(engine, pro, date, fields):
+def insert_and_update(conn, cursor, df, table, threadID = 0, nshards = 1):
+    for _, row in df.iterrows():
+        if 'ts_code' in df.columns and ut.table_shardid(row['ts_code'], nshards) != threadID:
+            continue
+            
+        table_shard = table + '_' + str(threadID) if nshards > 1 else table
+        clause_select = ','.join([name for name in df.columns])
+        clause_where = " AND ".join(map(lambda k: "{} = '{}'".format(k, row[k]), ut.primary_key(table)))
+        sql_query = "SELECT {} FROM {} WHERE {};".format(clause_select, table_shard, clause_where)
+        ret_query = cursor.execute(sql_query)
+        res_query = cursor.fetchall()
+        if ret_query == 0:
+            # insert
+            clause_insert_keys = clause_select
+            clause_insert_values = ','.join(map(lambda k: '\"{}\"'.format(ut.value_escape(row[k])) if not pd.isnull(row[k]) else 'NULL', df.columns))
+            sql_insert = "INSERT INTO {} ({}) VALUES ({})".format(table_shard, clause_insert_keys, clause_insert_values)
+            #print(sql_insert)
+            ret = cursor.execute(sql_insert)
+            conn.commit()
+        else:
+            # update
+            df_query = pd.DataFrame(list(res_query), columns = df.columns)
+            need_update = False
+            clause_set = []
+            for name in df.columns:
+                if not pd.isnull(row[name]) and not ut.value_eq(row[name], df_query.loc[0][name]):
+                    need_update = True
+                    clause_set.append("{}=\"{}\"".format(name, ut.value_escape(row[name])))
+            if need_update:
+                sql_update = "UPDATE {} SET {} WHERE {};".format(table_shard, ','.join(clause_set), clause_where)
+                #print(sql_update)
+                ret = cursor.execute(sql_update)
+                conn.commit()
+
+
+def collect_stock_basic(pro, fields):
+    conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
+    cursor = conn.cursor()
+    df = pro.stock_basic(fields = fields)
+    insert_and_update(conn, cursor, df, 'stock')
+    cursor.close()
+    conn.close()
+
+    
+def collect_stock_company(pro, fields):
+    conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
+    cursor = conn.cursor()    
+    df = pro.stock_company(fields = fields)
+    insert_and_update(conn, cursor, df, 'stock')    
+    cursor.close()
+    conn.close()    
+
+    
+def collect_exchange_open(pro, start_date, end_date, fields):
+    conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
+    cursor = conn.cursor()        
+    df = pro.trade_cal(exchange = 'SSE', start_date = start_date, end_date = end_date, fields = fields)
+    insert_and_update(conn, cursor, df, 'exchange_daily')
+    df = pro.trade_cal(exchange = 'SZSE', start_date = start_date, end_date = end_date, fields = fields)
+    insert_and_update(conn, cursor, df, 'exchange_daily')    
+    cursor.close()
+    conn.close()     
+
+    
+def collect_adj_factor(pro, date, fields, nshards):
     df = pro.adj_factor(trade_date = date.strftime("%Y%m%d"), fields = fields)
-    insert_and_update(df, 'stock_daily')
+    multithreads_run(df, 'stock_daily', nshards)
 
+    
+def collect_daily(pro, date, fields, nshards):
+    df = pro.daily(trade_date = date.strftime("%Y%m%d"), fields = fields)
+    df.rename(columns = {'change' : 'chg'}, inplace = True)
+    multithreads_run(df, 'stock_daily', nshards)
 
-def collect_daily_basic(engine, pro, date, fields):
+    
+def collect_daily_basic(pro, date, fields, nshards):
     df = pro.daily_basic(trade_date = date.strftime("%Y%m%d"), fields = fields)
-    insert_and_update(df, 'stock_daily')
+    multithreads_run(df, 'stock_daily', nshards)       
 
-
-def daily_wrapper(engine, pro, start_date, end_date, func, fields):
+    
+def multithreads_run(df, table, nshards):
+    conns, cursors, threads = [], [], []
+    for i in range(nshards):
+        conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
+        cursor = conn.cursor()
+        thread = insertUpdateThread(i, conn, cursor, df, table, nshards)
+    
+        conns.append(conn)
+        cursors.append(cursor)
+        threads.append(thread)
+    
+        threads[i].start()    
+    
+    for i in range(nshards):
+        threads[i].join()
+    
+    for i in range(nshards):
+        cursors[i].close()
+        conns[i].close()       
+        
+    
+def daily_wrapper(pro, start_date, end_date, func, fields, nshards):
     start = datetime.date(start_date // 10000, start_date % 10000 // 100, start_date % 100)
     end = datetime.date(end_date // 10000, end_date % 10000 // 100, end_date % 100)
     delta = datetime.timedelta(days = 1)
     date = start
     while date <= end:
         print(func.__name__ + ' ' + date.strftime("%Y-%m-%d"))
-        func(engine, pro, date, fields)
+        func(pro, date, fields, nshards)
         date += delta
-        
+ 
 
 if __name__ == "__main__":
 
-    engine = create_engine("mysql+pymysql://{}:{}@{}:{}/{}".format('root', '', 'localhost', '3306', 'trade'))
-    
-    conf_file = os.path.join(os.path.abspath('..'), 'conf', 'spider_batch.yaml')
+    conf_file = os.path.join(os.path.abspath('.'), 'conf', 'spider_batch.yaml')
     with open(conf_file, 'r', encoding = 'utf-8') as fs:
         conf_dict = yaml.load(fs, Loader = yaml.FullLoader)
 
     pro = ts.pro_api()
+    nthreads_stock_daily = 10
         
     if 'stock_basic' in conf_dict and conf_dict['stock_basic']['enable']:
-        collect_stock_basic(engine, pro, conf_dict['stock_basic']['fields'])
+        conf = conf_dict['stock_basic']
+        collect_stock_basic(pro, conf['fields'])
 
     if 'stock_company' in conf_dict and conf_dict['stock_company']['enable']:
-        collect_stock_company(engine, pro, conf_dict['stock_company']['fields'])
+        conf = conf_dict['stock_company']
+        collect_stock_company(pro, conf['fields'])
 
     if 'exchange_open' in conf_dict and conf_dict['exchange_open']['enable']:
-        collect_exchange_open(engine, pro, conf_dict['exchange_open']['start_date'], conf_dict['exchange_open']['end_date'], conf_dict['exchange_open']['fields'])
+        conf = conf_dict['exchange_open']
+        collect_exchange_open(pro, conf['start_date'], conf['end_date'], conf['fields'])
         
     if 'daily' in conf_dict and conf_dict['daily']['enable']:
-        daily_wrapper(engine, pro, conf_dict['daily']['start_date'], conf_dict['daily']['end_date'], collect_daily, conf_dict['daily']['fields'])
+        conf = conf_dict['daily']
+        daily_wrapper(pro, conf['start_date'], conf['end_date'], collect_daily, conf['fields'], nthreads_stock_daily)
         
     if 'adj_factor' in conf_dict and conf_dict['adj_factor']['enable']:
-        daily_wrapper(engine, pro, conf_dict['adj_factor']['start_date'], conf_dict['adj_factor']['end_date'], collect_adj_factor, conf_dict['adj_factor']['fields'])
+        conf = conf_dict['adj_factor']
+        daily_wrapper(pro, conf['start_date'], conf['end_date'], collect_adj_factor, conf['fields'], nthreads_stock_daily)
 
     if 'daily_basic' in conf_dict and conf_dict['daily_basic']['enable']:
-        daily_wrapper(engine, pro, conf_dict['daily_basic']['start_date'], conf_dict['daily_basic']['end_date'], collect_daily_basic, conf_dict['daily_basic']['fields'])
-
-        
+        conf = conf_dict['daily_basic']
+        daily_wrapper(pro, conf['start_date'], conf['end_date'], collect_daily_basic, conf['fields'], nthreads_stock_daily)

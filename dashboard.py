@@ -1,6 +1,9 @@
+# -*- coding:utf-8 -*-
+
 from flask import Flask, render_template, redirect, url_for, request
 import pymysql
 from conf import config as cf
+from utils import utils as ut
 
 app = Flask(__name__)
 
@@ -20,7 +23,7 @@ def stock_basic():
 
     # query infos from table stock
     fields = ','.join(map(lambda k: k[0], cf.TABLE_SCHEMA['stock']))
-    sql = "SELECT {} FROM stock WHERE symbol='{}' LIMIT 1".format(fields, symbol)
+    sql = "SELECT {} FROM {} WHERE symbol='{}' LIMIT 1".format(fields, 'stock', symbol)
     ret = cursor.execute(sql)
     res = cursor.fetchone()
 
@@ -40,7 +43,8 @@ def stock_basic():
     if ts_code != '':
 
         # query prices from table stock_daily
-        sql = "SELECT trade_date,open,close,low,high FROM stock_daily WHERE ts_code='{}' AND trade_date BETWEEN '{}' AND '{}' ORDER BY trade_date".format(ts_code, '20200101', '20201231')
+        table_stock_daily = "stock_daily_{}".format(ut.table_shardid(ts_code, 10))
+        sql = "SELECT trade_date,open,close,low,high FROM {} WHERE ts_code='{}' AND trade_date<='{}' ORDER BY trade_date".format(table_stock_daily, ts_code, '20201231')
         ret = cursor.execute(sql)
         res = cursor.fetchall()
         
