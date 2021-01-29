@@ -23,16 +23,24 @@ class insertUpdateThread (threading.Thread):
 
         
 def insert_and_update(conn, cursor, df, table, threadID = 0, nshards = 1):
+    
+    cnt_query, cnt_insert, cnt_update = 0, 0, 0
+    
     for _, row in df.iterrows():
         if 'ts_code' in df.columns and ut.table_shardid(row['ts_code'], nshards) != threadID:
             continue
-            
+
+        # upper bounds and lower bounds
+        if row['ps_ttm'] > 999999.9999:
+            row['ps_ttm'] = 999999.9999
+
         table_shard = table + '_' + str(threadID) if nshards > 1 else table
         clause_select = ','.join([name for name in df.columns])
         clause_where = " AND ".join(map(lambda k: "{} = '{}'".format(k, row[k]), ut.primary_key(table)))
         sql_query = "SELECT {} FROM {} WHERE {};".format(clause_select, table_shard, clause_where)
         ret_query = cursor.execute(sql_query)
         res_query = cursor.fetchall()
+        cnt_query += 1
         if ret_query == 0:
             # insert
             clause_insert_keys = clause_select
@@ -41,6 +49,7 @@ def insert_and_update(conn, cursor, df, table, threadID = 0, nshards = 1):
             #print(sql_insert)
             ret = cursor.execute(sql_insert)
             conn.commit()
+            cnt_insert += 1
         else:
             # update
             df_query = pd.DataFrame(list(res_query), columns = df.columns)
@@ -55,7 +64,10 @@ def insert_and_update(conn, cursor, df, table, threadID = 0, nshards = 1):
                 #print(sql_update)
                 ret = cursor.execute(sql_update)
                 conn.commit()
-
+                cnt_update += 1
+                
+    print('Thread {}: query {} times, insert {} times, update {} times'.format(threadID, cnt_query, cnt_insert, cnt_update))
+                
 
 def collect_stock_basic(pro, fields):
     conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
