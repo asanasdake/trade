@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from flask import Flask, render_template, redirect, url_for, request
+from flask import Flask, render_template, redirect, url_for, request, jsonify
 import pymysql
 from conf import config as cf
 from utils import utils as ut
@@ -16,14 +16,17 @@ def index():
 @app.route('/stock_basic')
 def stock_basic():
 
-    symbol = request.values.get('symbol') or '000001'
+    query_key = 'symbol'
+    query_value = request.values.get('search_words') or '000001'
+    if not query_value.isdigit():
+        query_key = 'name'
 
     conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
     cursor = conn.cursor()
 
     # query infos from table stock
     fields = ','.join(map(lambda k: k[0], cf.TABLE_SCHEMA['stock']))
-    sql = "SELECT {} FROM {} WHERE symbol='{}' LIMIT 1".format(fields, 'stock', symbol)
+    sql = "SELECT {} FROM {} WHERE {}='{}' LIMIT 1".format(fields, 'stock', query_key, query_value)
     ret = cursor.execute(sql)
     res = cursor.fetchone()
 
@@ -56,7 +59,27 @@ def stock_basic():
     cursor.close()
     conn.close()
     
-    return render_template('stock_basic.html', symbol = symbol, basic = basic, dates = dates, prices = prices)
+    return render_template('stock_basic.html', search_words = query_value, basic = basic, dates = dates, prices = prices)
+
+
+@app.route('/query_sug', methods = ['POST'])
+def query_sug():
+    query = ut.value_escape(request.form['query'])
+    sql = ''
+    if query.isdigit():
+        sql = "SELECT symbol FROM stock WHERE symbol LIKE '{}%' LIMIT 10".format(query)
+    else:
+        sql = "SELECT name FROM stock WHERE name LIKE '%{}%' LIMIT 10".format(query)
+    
+    conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
+    cursor = conn.cursor()
+    ret = cursor.execute(sql)
+    res = cursor.fetchall()
+    cursor.close()
+    conn.close()
+            
+    return jsonify([item[0] for item in res])
+
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', port = 5000)

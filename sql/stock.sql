@@ -29,6 +29,7 @@ create table stock (
        main_business varchar(500),
        business_scope varchar(2000),
        primary key(ts_code),
-       key(symbol)
+       key(symbol),
+       key(name)
        ) engine = InnoDB default charset = utf8;
 

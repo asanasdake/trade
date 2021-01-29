@@ -25,6 +25,7 @@
     <!-- Core plugin JavaScript-->
     <script src="../static/vendor/jquery-easing/jquery.easing.min.js"></script>
     <script src="../static/vendor/echarts/echarts.min.js"></script>
+    <script src="../static/vendor/bootstrap-typeahead/bootstrap-typeahead.js"></script>
     
   </head>
   
@@ -86,12 +87,12 @@
 	    </div>
 
 	    <!-- Query Box -->
-	    <form role="form" action="/stock_basic">
+	    <form role="search" action="/stock_basic">
 	      <div class="form-group">
-		<label class="sr-only" for="input_symbol">股票代码</label>
-		<input type="text" class="form-control" id="input_symbol" name="symbol" value="{{symbol|safe}}">
+		<label class="sr-only" for="search_words">股票代码</label>
+		<input type="text" class="form-control" id="search_words" name="search_words" data-provide="typeahead" autocomplete="off" placeholder="{{search_words|safe}}">
 	      </div>
-	      <input type="submit" style="display:none"></input>
+	      <input type="submit" class="btn" style="display:none"></input>
 	    </form>
 
 	    <!-- Stock Prices Chart -->
@@ -260,6 +261,23 @@
       
     </div>
 
+    <script>
+      $(document).ready(function($) {
+	  $.fn.typeahead.Constructor.prototype.blur = function() {
+	      var that = this;
+	      setTimeout(function () { that.hide() }, 250);
+	  };
+	  $('#search_words').typeahead({
+	      source: function(query, process, sync, async) {
+		  var parameter = {query: query};
+		  $.post('/query_sug', parameter, function (data) {
+		      process(data);
+		  });
+	      },
+	  });
+      })
+    </script>
+    
     <!-- Custom scripts for all pages -->
     <script src="../static/js/sb-admin-2.min.js"></script>
     
