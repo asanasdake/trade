@@ -83,14 +83,14 @@
 
             <!-- Page Heading -->
 	    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-	      <h1 class="h3 mb-0 text-gray-800">个股信息：【{{ basic.2.1 }}】</h1>
+	      <h1 class="h3 mb-0 text-gray-800">个股信息：【{{ basic.1.1 }} - {{ basic.2.1 }}】</h1>
 	    </div>
 
 	    <!-- Query Box -->
 	    <form role="search" action="/stock_basic">
 	      <div class="form-group">
 		<label class="sr-only" for="search_words">股票代码</label>
-		<input type="text" class="form-control" id="search_words" name="search_words" data-provide="typeahead" autocomplete="off" placeholder="{{search_words|safe}}">
+		<input type="text" class="form-control" id="search_words" name="search_words" data-provide="typeahead" autocomplete="off" placeholder="股票代码(eg. 600519) or 股票名称(eg. 贵州茅台)">
 	      </div>
 	      <input type="submit" class="btn" style="display:none"></input>
 	    </form>
@@ -261,6 +261,7 @@
       
     </div>
 
+    <!-- Smart Query Box -->
     <script>
       $(document).ready(function($) {
 	  $.fn.typeahead.Constructor.prototype.blur = function() {
@@ -268,14 +269,15 @@
 	      setTimeout(function () { that.hide() }, 250);
 	  };
 	  $('#search_words').typeahead({
-	      source: function(query, process, sync, async) {
+	      source: function (query, process) {
 		  var parameter = {query: query};
 		  $.post('/query_sug', parameter, function (data) {
 		      process(data);
 		  });
 	      },
+	      items: 20,
 	  });
-      })
+      });
     </script>
     
     <!-- Custom scripts for all pages -->

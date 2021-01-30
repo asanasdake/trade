@@ -69,7 +69,7 @@ def query_sug():
     if query.isdigit():
         sql = "SELECT symbol FROM stock WHERE symbol LIKE '{}%' LIMIT 10".format(query)
     else:
-        sql = "SELECT name FROM stock WHERE name LIKE '%{}%' LIMIT 10".format(query)
+        sql = "SELECT name FROM stock WHERE name LIKE '%{}%'".format(query)
     
     conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
     cursor = conn.cursor()
