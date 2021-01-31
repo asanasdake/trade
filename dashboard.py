@@ -49,7 +49,8 @@ def stock_basic():
 
         # query prices from table stock_daily
         table_stock_daily = "stock_daily_{}".format(ut.table_shardid(ts_code, 10))
-        sql = "SELECT trade_date,open,close,low,high FROM {} WHERE ts_code='{}' AND trade_date<='{}' ORDER BY trade_date".format(table_stock_daily, ts_code, '20201231')
+        # remove suspension
+        sql = "SELECT trade_date,open,close,low,high FROM {} WHERE ts_code='{}' AND trade_date<='{}' AND open is not NULL ORDER BY trade_date".format(table_stock_daily, ts_code, '20201231')
         ret = cursor.execute(sql)
         res = cursor.fetchall()
         
