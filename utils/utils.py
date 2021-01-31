@@ -32,6 +32,10 @@ def primary_key(table):
     else:
         return []
 
+def value_bounds(row):
+    for key in ['ps_ttm', 'pe_ttm']:
+        if row[key] > 999999.9999:
+            row[key] = 999999.9999
 
 if __name__ == '__main__':
     print('test')

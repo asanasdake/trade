@@ -26,7 +26,7 @@ adj_factor:
     enable: false
 
 daily_basic:
-    start_date: 20100325
+    start_date: 20171028
     end_date: 20201231
     fields: ts_code,trade_date,turnover_rate,turnover_rate_f,volume_ratio,pe,pe_ttm,pb,ps,ps_ttm,dv_ratio,dv_ttm,total_share,float_share,total_mv,circ_mv
     enable: true

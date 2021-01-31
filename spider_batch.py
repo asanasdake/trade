@@ -31,8 +31,7 @@ def insert_and_update(conn, cursor, df, table, threadID = 0, nshards = 1):
             continue
 
         # upper bounds and lower bounds
-        if row['ps_ttm'] > 999999.9999:
-            row['ps_ttm'] = 999999.9999
+        ut.value_bounds(row)
 
         table_shard = table + '_' + str(threadID) if nshards > 1 else table
         clause_select = ','.join([name for name in df.columns])
