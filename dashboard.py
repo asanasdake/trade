@@ -17,7 +17,9 @@ def index():
 def stock_basic():
 
     query_key = 'symbol'
-    query_value = request.values.get('search_words') or '000001'
+    query_value = request.values.get('search_words') or '000001 - 平安银行'
+    if ' - ' in query_value:
+        query_value = query_value.split(' - ')[0]
     if not query_value.isdigit():
         query_key = 'name'
 
@@ -67,9 +69,9 @@ def query_sug():
     query = ut.value_escape(request.form['query'])
     sql = ''
     if query.isdigit():
-        sql = "SELECT symbol FROM stock WHERE symbol LIKE '{}%' LIMIT 10".format(query)
+        sql = "SELECT symbol,name FROM stock WHERE symbol LIKE '{}%' LIMIT 10".format(query)
     else:
-        sql = "SELECT name FROM stock WHERE name LIKE '%{}%'".format(query)
+        sql = "SELECT symbol,name FROM stock WHERE name LIKE '%{}%'".format(query)
     
     conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
     cursor = conn.cursor()
@@ -78,7 +80,7 @@ def query_sug():
     cursor.close()
     conn.close()
             
-    return jsonify([item[0] for item in res])
+    return jsonify(["{} - {}".format(item[0], item[1]) for item in res])
 
 
 if __name__ == '__main__':
