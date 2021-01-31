@@ -7,6 +7,12 @@ import datetime
 from utils import utils as ut
 import threading
 import decimal
+import logging
+
+logging.basicConfig(level = logging.INFO,
+                    format = "%(asctime)s %(levelname)s %(message)s",
+                    datefmt = '%Y-%m-%d %H:%M:%S'
+)
 
 class insertUpdateThread (threading.Thread):
     def __init__(self, threadID, conn, cursor, df, table, nshards):
@@ -37,18 +43,28 @@ def insert_and_update(conn, cursor, df, table, threadID = 0, nshards = 1):
         clause_select = ','.join([name for name in df.columns])
         clause_where = " AND ".join(map(lambda k: "{} = '{}'".format(k, row[k]), ut.primary_key(table)))
         sql_query = "SELECT {} FROM {} WHERE {};".format(clause_select, table_shard, clause_where)
-        ret_query = cursor.execute(sql_query)
-        res_query = cursor.fetchall()
-        cnt_query += 1
+        try:
+            ret_query = cursor.execute(sql_query)
+            res_query = cursor.fetchall()
+        except Exception as err:
+            logging.error(err)
+            raise(err)
+        else:
+            cnt_query += 1
         if ret_query == 0:
             # insert
             clause_insert_keys = clause_select
             clause_insert_values = ','.join(map(lambda k: '\"{}\"'.format(ut.value_escape(row[k])) if not pd.isnull(row[k]) else 'NULL', df.columns))
             sql_insert = "INSERT INTO {} ({}) VALUES ({})".format(table_shard, clause_insert_keys, clause_insert_values)
-            #print(sql_insert)
-            ret = cursor.execute(sql_insert)
-            conn.commit()
-            cnt_insert += 1
+            logging.debug(sql_insert)
+            try:
+                ret = cursor.execute(sql_insert)
+                conn.commit()
+            except Exception as err:
+                logging.info(sql_insert)
+                logging.error(err)
+            else:
+                cnt_insert += 1
         else:
             # update
             df_query = pd.DataFrame(list(res_query), columns = df.columns)
@@ -60,12 +76,17 @@ def insert_and_update(conn, cursor, df, table, threadID = 0, nshards = 1):
                     clause_set.append("{}=\"{}\"".format(name, ut.value_escape(row[name])))
             if need_update:
                 sql_update = "UPDATE {} SET {} WHERE {};".format(table_shard, ','.join(clause_set), clause_where)
-                #print(sql_update)
-                ret = cursor.execute(sql_update)
-                conn.commit()
-                cnt_update += 1
+                logging.debug(sql_update)
+                try:
+                    ret = cursor.execute(sql_update)
+                    conn.commit()
+                except Exception as err:
+                    logging.info(sql_update)
+                    logging.error(err)
+                else:
+                    cnt_update += 1
                 
-    print('Thread {}: query {} times, insert {} times, update {} times'.format(threadID, cnt_query, cnt_insert, cnt_update))
+    logging.info('Thread {}: query {} times, insert {} times, update {} times'.format(threadID, cnt_query, cnt_insert, cnt_update))
                 
 
 def collect_stock_basic(pro, fields):
@@ -140,7 +161,7 @@ def daily_wrapper(pro, start_date, end_date, func, fields, nshards):
     delta = datetime.timedelta(days = 1)
     date = start
     while date <= end:
-        print(func.__name__ + ' ' + date.strftime("%Y-%m-%d"))
+        logging.info('FUNC: ' + func.__name__ + ' DATE: ' + date.strftime("%Y-%m-%d"))
         func(pro, date, fields, nshards)
         date += delta
  
