@@ -9,7 +9,7 @@ import threading
 import decimal
 import logging
 
-logging.basicConfig(level = logging.INFO,
+logging.basicConfig(level = logging.DEBUG,
                     format = "%(asctime)s %(levelname)s %(message)s",
                     datefmt = '%Y-%m-%d %H:%M:%S'
 )
@@ -102,6 +102,7 @@ def collect_stock_company(pro, fields):
     conn = pymysql.connect(host = "localhost", user = "root", password = "", database = "trade")
     cursor = conn.cursor()    
     df = pro.stock_company(fields = fields)
+    df['symbol'] = df['ts_code'].apply(lambda x: x[:6])
     insert_and_update(conn, cursor, df, 'stock')    
     cursor.close()
     conn.close()    
