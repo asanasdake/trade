@@ -34,11 +34,11 @@ def primary_key(table):
 
 def value_bounds(row):
     for key in ['ps_ttm', 'pe_ttm']:
-        if row[key] > 999999.9999:
+        if key in row and row[key] > 999999.9999:
             row[key] = 999999.9999
 
     for key in ['dv_ratio', 'dv_ttm']:
-        if row[key] > 99.9999:
+        if key in row and row[key] > 99.9999:
             row[key] = 99.9999
             
 if __name__ == '__main__':
